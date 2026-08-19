@@ -1,0 +1,693 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Casa nova — checklist</title>
+<style>
+  :root { color-scheme: light; }
+  html, body {
+    margin: 0;
+    padding: 0;
+    background: #ffffff;
+  }
+  #kanban-root {
+    font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+    color: #1a1a1a;
+    padding: 16px;
+    box-sizing: border-box;
+  }
+  .kb-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 12px;
+    margin-bottom: 1.25rem;
+    flex-wrap: wrap;
+  }
+  .kb-title {
+    font-family: Georgia, serif;
+    font-size: 22px;
+    font-weight: 500;
+    margin: 0 0 2px;
+  }
+  .kb-subtitle {
+    font-size: 13px;
+    color: #666;
+    margin: 0;
+  }
+  .kb-refresh-btn {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: transparent;
+    border: 0.5px solid #ccc;
+    border-radius: 8px;
+    padding: 8px 14px;
+    font-size: 13px;
+    cursor: pointer;
+    color: #1a1a1a;
+    white-space: nowrap;
+  }
+  .kb-refresh-btn:hover { background: #f5f5f5; }
+  .kb-refresh-btn:active { transform: scale(0.98); }
+  .kb-refresh-btn.loading .kb-refresh-icon { animation: kb-spin 0.7s linear infinite; }
+  @keyframes kb-spin { to { transform: rotate(360deg); } }
+  .kb-board-scroll {
+    overflow-x: auto;
+    overflow-y: hidden;
+    transform: rotateX(180deg);
+    padding-bottom: 10px;
+  }
+  .kb-board {
+    display: grid;
+    grid-auto-flow: column;
+    grid-auto-columns: 240px;
+    gap: 12px;
+    transform: rotateX(180deg);
+  }
+  .kb-col {
+    background: #f7f6f2;
+    border-radius: 12px;
+    padding: 10px;
+    display: flex;
+    flex-direction: column;
+    min-height: 120px;
+  }
+  .kb-col-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 4px 6px 10px;
+    border-bottom: 1px solid #ddd;
+    margin-bottom: 8px;
+  }
+  .kb-col-name {
+    font-size: 13px;
+    font-weight: 500;
+    letter-spacing: 0.01em;
+  }
+  .kb-col-count {
+    font-family: ui-monospace, "SFMono-Regular", monospace;
+    font-size: 11px;
+    color: #999;
+    background: #fff;
+    border-radius: 10px;
+    padding: 1px 7px;
+    border: 0.5px solid #ddd;
+  }
+  .kb-cards {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    min-height: 20px;
+    flex: 1;
+  }
+  .kb-card {
+    background: #fff;
+    border: 0.5px solid #e2e0d8;
+    border-radius: 8px;
+    padding: 8px 9px;
+    font-size: 13px;
+    line-height: 1.45;
+    cursor: grab;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .kb-card.dragging { opacity: 0.35; }
+  .kb-card-top {
+    display: flex;
+    align-items: flex-start;
+    gap: 6px;
+  }
+  .kb-card-text {
+    flex: 1;
+    word-break: break-word;
+    outline: none;
+  }
+  .kb-card-del {
+    background: none;
+    border: none;
+    color: #aaa;
+    cursor: pointer;
+    font-size: 15px;
+    line-height: 1;
+    padding: 0 2px;
+    flex-shrink: 0;
+  }
+  .kb-card-del:hover { color: #c0392b; }
+  .kb-card-assignee-row {
+    display: flex;
+    gap: 4px;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .kb-assign-btn {
+    font-size: 14px;
+    line-height: 1;
+    padding: 3px 7px;
+    border-radius: 8px;
+    border: 0.5px solid #ddd;
+    background: #f5f5f2;
+    cursor: pointer;
+    opacity: 0.4;
+  }
+  .kb-assign-btn.active {
+    opacity: 1;
+    background: #e6f1fb;
+    border-color: transparent;
+  }
+  .kb-due-input {
+    font-size: 11px;
+    padding: 2px 4px;
+    border-radius: 6px;
+    border: 0.5px solid #ddd;
+    background: #f5f5f2;
+    color: #666;
+    max-width: 108px;
+  }
+  .kb-due-input.overdue {
+    background: #fcebeb;
+    color: #791f1f;
+    border-color: transparent;
+  }
+  .kb-col.drag-over { background: #ececec; }
+  .kb-add-row { display: flex; gap: 4px; margin-top: 8px; }
+  .kb-add-input {
+    flex: 1;
+    font-size: 12px;
+    padding: 6px 8px;
+    border-radius: 6px;
+    border: 0.5px solid #ddd;
+    background: #fff;
+    color: inherit;
+  }
+  .kb-add-btn {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    background: #e6f1fb;
+    border: 0.5px solid transparent;
+    border-radius: 6px;
+    padding: 0 10px;
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  .kb-add-btn:hover { filter: brightness(0.96); }
+  .kb-add-btn:active { transform: scale(0.98); }
+  .kb-status {
+    font-size: 11px;
+    color: #999;
+    margin-top: 10px;
+  }
+  .kb-export-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.35);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 50;
+    padding: 20px;
+    box-sizing: border-box;
+  }
+  .kb-export-box {
+    background: #fff;
+    border-radius: 12px;
+    padding: 18px;
+    max-width: 560px;
+    width: 100%;
+    box-shadow: 0 8px 30px rgba(0,0,0,0.2);
+  }
+  .kb-export-box h3 {
+    margin: 0 0 6px;
+    font-size: 15px;
+  }
+  .kb-export-box p {
+    margin: 0 0 10px;
+    font-size: 12px;
+    color: #666;
+    line-height: 1.5;
+  }
+  .kb-export-text {
+    width: 100%;
+    height: 220px;
+    box-sizing: border-box;
+    font-family: ui-monospace, "SFMono-Regular", monospace;
+    font-size: 11px;
+    padding: 8px;
+    border-radius: 8px;
+    border: 0.5px solid #ddd;
+    resize: vertical;
+    background: #f7f6f2;
+    color: #1a1a1a;
+  }
+  .kb-export-actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 10px;
+    justify-content: flex-end;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+  .kb-export-download {
+    font-size: 12px;
+    text-decoration: none;
+    color: #1a1a1a;
+    background: #e6f1fb;
+    border-radius: 6px;
+    padding: 7px 12px;
+  }
+  .kb-export-close {
+    font-size: 12px;
+    background: transparent;
+    border: 0.5px solid #ccc;
+    border-radius: 6px;
+    padding: 7px 12px;
+    cursor: pointer;
+  }
+</style>
+</head>
+<body>
+<div id="kanban-root"></div>
+<script>
+(function () {
+  var STORAGE_KEY = "casa-kanban-board-v1";
+  var JSONBIN_BIN_ID = "6a85e514f5f4af5e29298c20";
+  var JSONBIN_ACCESS_KEY = "$2a$10$Cle/FGBQhSvIbczbn.tHAejKwXmtMuCurBwmGYG.DPbYxXumm2OkG";
+  var JSONBIN_BASE_URL = "https://api.jsonbin.io/v3/b/" + JSONBIN_BIN_ID;
+  var COLUMN_DEFS = [
+    { id: "backlog", name: "Backlog" },
+    { id: "afazer", name: "A fazer" },
+    { id: "fazendo", name: "Fazendo" },
+    { id: "compras", name: "Compras" },
+    { id: "onhold", name: "On hold" },
+    { id: "feito", name: "Feito" }
+  ];
+  var DEFAULT_BOARD = {
+    "backlog": [
+      { "id": "c37_msxduh93", "text": "Instalar bloqueio visual no portão (com proteção pros gatos)", "assignees": [], "due": "" },
+      { "id": "c38_msxduh93", "text": "Comprar e instalar pressurizador", "assignees": [], "due": "" },
+      { "id": "c39_msxduh93", "text": "Comprar e instalar aquecedor central", "assignees": [], "due": "" },
+      { "id": "c40_msxduh93", "text": "Limpar chuveiro da suíte (tornar banheiro da suíte habitável pro Will)", "assignees": [], "due": "" }
+    ],
+    "afazer": [
+      { "id": "c41_msxduh93", "text": "Tirar pratos das plantas", "assignees": [], "due": "" },
+      { "id": "c42_msxduh93", "text": "Instalar pés na mesa de escritório da Fer", "assignees": ["unicorn", "bear"], "due": "" },
+      { "id": "c43_msxduh93", "text": "Identificar número de cada abertura (porta e janela) no gestor da Verisure", "assignees": ["unicorn", "bear"], "due": "" },
+      { "id": "c44_msxduh93", "text": "Ver se tem como trocar o toque da Verisure (diferente dos vizinhos)", "assignees": ["unicorn", "bear"], "due": "" },
+      { "id": "c45_msxduh93", "text": "Limpar filtros das torneiras", "assignees": [], "due": "" },
+      { "id": "c46_msxduh93", "text": "Chamar chaveiro (todas as aberturas funcionando, com chave pra tudo, trocar chave da rua)", "assignees": [], "due": "" }
+    ],
+    "fazendo": [
+      { "id": "c48_msxduh93", "text": "Planejar coisas dos gatos no calendário", "assignees": ["bear"], "due": "" },
+      { "id": "c49_msxduh93", "text": "Ligar água", "assignees": ["bear"], "due": "" }
+    ],
+    "compras": [
+      { "id": "c50_msxduh93", "text": "Pés mesa escritório Fer 2", "assignees": [], "due": "" },
+      { "id": "c51_msxduh93", "text": "Lixo seletivo nos escritórios", "assignees": [], "due": "" },
+      { "id": "c52_msxduh93", "text": "Lixo banheiro ridícula", "assignees": [], "due": "" },
+      { "id": "c53_msxduh93", "text": "Limpar caixa d'água (comprar bota de borracha)", "assignees": [], "due": "" },
+      { "id": "c54_msxduh93", "text": "Ferragem (o'ring torneira cozinha)", "assignees": [], "due": "" },
+      { "id": "c55_msxduh93", "text": "Comprar e pendurar ganchinhos de arrumar cabide nos armários", "assignees": [], "due": "" },
+      { "id": "c56_msxduh93", "text": "🛍 Cortina blackout na suíte", "assignees": [], "due": "" },
+      { "id": "c57_msxduh93", "text": "🛍 Móvel para bar (e louças?)", "assignees": [], "due": "" },
+      { "id": "c59_msxduh93", "text": "🛍 Estante sala principal (som, decoração)", "assignees": [], "due": "" },
+      { "id": "c60_msxduh93", "text": "🛍 Estante sala de TV (jogos, livros)", "assignees": [], "due": "" },
+      { "id": "c61_msxduh93", "text": "🛍 Cesto recolher roupa", "assignees": [], "due": "" },
+      { "id": "c62_msxduh93", "text": "🛍 Baú / cesto pras redes", "assignees": [], "due": "" },
+      { "id": "c63_msxduh93", "text": "🛍 Toalheiro aquecido", "assignees": [], "due": "" },
+      { "id": "c64_msxduh93", "text": "🛍 Tapete redondo", "assignees": [], "due": "" },
+      { "id": "c65_msxduh93", "text": "🛍 Recamier ou baú para janela", "assignees": [], "due": "" },
+      { "id": "c37_msymymzj", "text": "🛍 Arara de parede para lavanderia", "assignees": [], "due": "" }
+    ],
+    "onhold": [
+      { "id": "c66_msxduh93", "text": "Descer coisas gatos (caixa de areia, água, comida)", "assignees": [], "due": "" },
+      { "id": "c67_msxduh93", "text": "Ver sobre Verisure", "assignees": [], "due": "" },
+      { "id": "c68_msxduh93", "text": "Ver alternativas pra telagem do terreno (ou contratar Imperial para frente)", "assignees": [], "due": "" },
+      { "id": "c69_msxduh93", "text": "Comprar coisas e instalar telas em cima dos banheiros", "assignees": [], "due": "" },
+      { "id": "c70_msxduh93", "text": "Mosquiteiro da ridícula", "assignees": ["bear"], "due": "" }
+    ],
+    "feito": [
+      { "id": "c71_msxduh93", "text": "Comprar areia", "assignees": ["bear"], "due": "" },
+      { "id": "c72_msxduh93", "text": "Programar areia e ração com Mercearia do Animal", "assignees": ["bear"], "due": "" },
+      { "id": "c58_msxduh93", "text": "🛍 Móvel de louças (ou c/ bar) > Aparador Rafa e Ana", "assignees": ["bear"], "due": "" },
+      { "id": "c47_msxduh93", "text": "Comprar adega Soho", "assignees": ["bear"], "due": "" }
+    ]
+  };
+  var idCounter = 1;
+  function makeId() { return "c" + (idCounter++) + "_" + Date.now().toString(36); }
+  function toCardObjects(rawBoard) {
+    var out = {};
+    COLUMN_DEFS.forEach(function (col) {
+      var items = (rawBoard && rawBoard[col.id]) || [];
+      out[col.id] = items.map(function (item) {
+        if (typeof item === "string") return { id: makeId(), text: item, assignees: [], due: "" };
+        return { id: item.id || makeId(), text: item.text || "", assignees: Array.isArray(item.assignees) ? item.assignees : [], due: item.due || "" };
+      });
+    });
+    return out;
+  }
+  var board = toCardObjects(DEFAULT_BOARD);
+  var dragState = null;
+  var root = document.getElementById("kanban-root");
+  function render() {
+    var todayStr = new Date().toISOString().slice(0, 10);
+    var html = "";
+    html += '<div class="kb-header">';
+    html += '  <div><p class="kb-title">Casa nova — checklist</p><p class="kb-subtitle" id="kb-updated">Carregando...</p><p class="kb-subtitle" style="margin-top:2px;">Quadro compartilhado — todos que abrirem este link veem e editam o mesmo checklist</p></div>';
+    html += '  <div style="display:flex; gap:8px; flex-wrap:wrap;">';
+    html += '    <button class="kb-refresh-btn" id="kb-export">Exportar dados</button>';
+    html += '    <button class="kb-refresh-btn" id="kb-refresh"><span class="kb-refresh-icon" aria-hidden="true">↻</span>Atualizar</button>';
+    html += '  </div>';
+    html += '</div>';
+    html += '<div class="kb-board-scroll"><div class="kb-board" id="kb-board">';
+    COLUMN_DEFS.forEach(function (col) {
+      var cards = board[col.id] || [];
+      html += '<div class="kb-col" data-col="' + col.id + '">';
+      html += '  <div class="kb-col-head"><span class="kb-col-name">' + col.name + '</span><span class="kb-col-count">' + cards.length + '</span></div>';
+      html += '  <div class="kb-cards" data-col="' + col.id + '">';
+      cards.forEach(function (card) {
+        var assignees = card.assignees || [];
+        var hasBear = assignees.indexOf("bear") !== -1;
+        var hasUnicorn = assignees.indexOf("unicorn") !== -1;
+        var due = card.due || "";
+        var isOverdue = due && due < todayStr && col.id !== "feito";
+        html += '    <div class="kb-card" draggable="true" data-id="' + card.id + '" data-col="' + col.id + '">';
+        html += '      <div class="kb-card-top">';
+        html += '        <span class="kb-card-text" contenteditable="true" spellcheck="false" data-id="' + card.id + '">' + escapeHtml(card.text) + '</span>';
+        html += '        <button class="kb-card-del" data-id="' + card.id + '" data-col="' + col.id + '" aria-label="Excluir">×</button>';
+        html += '      </div>';
+        html += '      <div class="kb-card-assignee-row">';
+        html += '        <div style="display:flex; gap:4px;">';
+        html += '          <button class="kb-assign-btn' + (hasBear ? " active" : "") + '" data-id="' + card.id + '" data-who="bear" aria-label="Urso polar" aria-pressed="' + hasBear + '">🐻‍❄️</button>';
+        html += '          <button class="kb-assign-btn' + (hasUnicorn ? " active" : "") + '" data-id="' + card.id + '" data-who="unicorn" aria-label="Unicórnio" aria-pressed="' + hasUnicorn + '">🦄</button>';
+        html += '        </div>';
+        html += '        <input type="date" class="kb-due-input' + (isOverdue ? " overdue" : "") + '" data-id="' + card.id + '" value="' + due + '" aria-label="Data prevista" />';
+        html += '      </div>';
+        html += '    </div>';
+      });
+      html += '  </div>';
+      html += '  <div class="kb-add-row"><input class="kb-add-input" placeholder="Nova atividade..." data-col="' + col.id + '" /><button class="kb-add-btn" data-col="' + col.id + '" aria-label="Adicionar card">+ Adicionar</button></div>';
+      html += '</div>';
+    });
+    html += '</div></div>';
+    html += '<p class="kb-status" id="kb-status"></p>';
+    html += '<div class="kb-export-overlay" id="kb-export-overlay" style="display:none;">';
+    html += '  <div class="kb-export-box">';
+    html += '    <h3>Exportar dados do checklist</h3>';
+    html += '    <p>Copie o texto abaixo (ou baixe o arquivo) e envie de volta no chat para eu recriar o mesmo checklist em outra conta.</p>';
+    html += '    <textarea class="kb-export-text" id="kb-export-text" readonly></textarea>';
+    html += '    <div class="kb-export-actions">';
+    html += '      <a class="kb-export-download" id="kb-export-download" download="casa-nova-checklist-dados.json">Baixar arquivo .json</a>';
+    html += '      <button class="kb-export-close" id="kb-export-close">Fechar</button>';
+    html += '    </div>';
+    html += '  </div>';
+    html += '</div>';
+    root.innerHTML = html;
+    attachEvents();
+  }
+  function escapeHtml(s) {
+    var d = document.createElement("div");
+    d.innerText = s == null ? "" : s;
+    return d.innerHTML;
+  }
+  function setStatus(msg) {
+    var el = document.getElementById("kb-status");
+    if (el) el.textContent = msg;
+  }
+  function setUpdatedLabel(text) {
+    var el = document.getElementById("kb-updated");
+    if (el) el.textContent = text;
+  }
+  function attachEvents() {
+    var refreshBtn = document.getElementById("kb-refresh");
+    refreshBtn.addEventListener("click", function () { loadFromStorage(true); });
+    var exportBtn = document.getElementById("kb-export");
+    if (exportBtn) exportBtn.addEventListener("click", openExportOverlay);
+    var exportClose = document.getElementById("kb-export-close");
+    if (exportClose) exportClose.addEventListener("click", closeExportOverlay);
+    var exportOverlay = document.getElementById("kb-export-overlay");
+    if (exportOverlay) exportOverlay.addEventListener("click", function (e) {
+      if (e.target === exportOverlay) closeExportOverlay();
+    });
+    var cards = root.querySelectorAll(".kb-card");
+    cards.forEach(function (card) {
+      card.addEventListener("dragstart", function (e) {
+        if (e.target && (e.target.classList.contains("kb-assign-btn") || e.target.classList.contains("kb-due-input"))) {
+          e.preventDefault();
+          return;
+        }
+        dragState = { id: card.getAttribute("data-id"), from: card.getAttribute("data-col") };
+        if (e.dataTransfer) {
+          try { e.dataTransfer.setData("text/plain", dragState.id); } catch (err) {}
+          e.dataTransfer.effectAllowed = "move";
+        }
+        card.classList.add("dragging");
+      });
+      card.addEventListener("dragend", function () {
+        card.classList.remove("dragging");
+        dragState = null;
+      });
+    });
+    var texts = root.querySelectorAll(".kb-card-text");
+    texts.forEach(function (t) {
+      t.addEventListener("blur", function () {
+        var id = t.getAttribute("data-id");
+        var newText = t.innerText.trim();
+        updateCardText(id, newText);
+      });
+      t.addEventListener("keydown", function (e) {
+        if (e.key === "Enter") { e.preventDefault(); t.blur(); }
+      });
+    });
+    var assignees = root.querySelectorAll(".kb-assign-btn");
+    assignees.forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        var id = btn.getAttribute("data-id");
+        var who = btn.getAttribute("data-who");
+        toggleAssignee(id, who);
+      });
+      btn.addEventListener("mousedown", function (e) { e.stopPropagation(); });
+    });
+    var dueInputs = root.querySelectorAll(".kb-due-input");
+    dueInputs.forEach(function (inp) {
+      inp.addEventListener("change", function () {
+        var id = inp.getAttribute("data-id");
+        updateCardDue(id, inp.value);
+      });
+      inp.addEventListener("mousedown", function (e) { e.stopPropagation(); });
+    });
+    var delBtns = root.querySelectorAll(".kb-card-del");
+    delBtns.forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        var id = btn.getAttribute("data-id");
+        var colId = btn.getAttribute("data-col");
+        deleteCard(colId, id);
+      });
+    });
+    var addBtns = root.querySelectorAll(".kb-add-btn");
+    addBtns.forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        var colId = btn.getAttribute("data-col");
+        var input = root.querySelector('.kb-add-input[data-col="' + colId + '"]');
+        addCard(colId, input.value);
+        input.value = "";
+      });
+    });
+    var addInputs = root.querySelectorAll(".kb-add-input");
+    addInputs.forEach(function (input) {
+      input.addEventListener("keydown", function (e) {
+        if (e.key === "Enter") {
+          var colId = input.getAttribute("data-col");
+          addCard(colId, input.value);
+          input.value = "";
+        }
+      });
+    });
+    var cardLists = root.querySelectorAll(".kb-cards");
+    cardLists.forEach(function (list) {
+      list.addEventListener("dragover", function (e) {
+        if (!dragState) return;
+        e.preventDefault();
+        var draggingEl = root.querySelector('.kb-card[data-id="' + dragState.id + '"]');
+        if (!draggingEl) return;
+        var afterElement = getDragAfterElement(list, e.clientY);
+        if (afterElement == null) {
+          list.appendChild(draggingEl);
+        } else if (afterElement !== draggingEl) {
+          list.insertBefore(draggingEl, afterElement);
+        }
+      });
+    });
+    var cols = root.querySelectorAll(".kb-col");
+    cols.forEach(function (col) {
+      col.addEventListener("dragover", function (e) {
+        e.preventDefault();
+        col.classList.add("drag-over");
+      });
+      col.addEventListener("dragleave", function (e) {
+        if (!col.contains(e.relatedTarget)) col.classList.remove("drag-over");
+      });
+      col.addEventListener("drop", function (e) {
+        e.preventDefault();
+        col.classList.remove("drag-over");
+        if (!dragState) return;
+        dragState = null;
+        syncBoardFromDOM();
+        render();
+        saveToStorage();
+      });
+    });
+  }
+  function getDragAfterElement(container, y) {
+    var els = Array.prototype.slice.call(container.querySelectorAll(".kb-card:not(.dragging)"));
+    var result = { offset: Number.NEGATIVE_INFINITY, element: null };
+    els.forEach(function (child) {
+      var box = child.getBoundingClientRect();
+      var offset = y - box.top - box.height / 2;
+      if (offset < 0 && offset > result.offset) {
+        result = { offset: offset, element: child };
+      }
+    });
+    return result.element;
+  }
+  function syncBoardFromDOM() {
+    var allCards = {};
+    COLUMN_DEFS.forEach(function (col) {
+      (board[col.id] || []).forEach(function (c) { allCards[c.id] = c; });
+    });
+    var newBoard = {};
+    COLUMN_DEFS.forEach(function (col) {
+      var list = root.querySelector('.kb-cards[data-col="' + col.id + '"]');
+      var ids = list ? Array.prototype.slice.call(list.children).map(function (el) { return el.getAttribute("data-id"); }) : [];
+      newBoard[col.id] = ids.map(function (id) { return allCards[id]; }).filter(Boolean);
+    });
+    board = newBoard;
+  }
+  function openExportOverlay() {
+    var json = JSON.stringify(board, null, 2);
+    var ta = document.getElementById("kb-export-text");
+    var dl = document.getElementById("kb-export-download");
+    var overlay = document.getElementById("kb-export-overlay");
+    if (ta) ta.value = json;
+    if (dl) dl.href = "data:application/json;charset=utf-8," + encodeURIComponent(json);
+    if (overlay) overlay.style.display = "flex";
+    if (ta) { ta.focus(); ta.select(); }
+  }
+  function closeExportOverlay() {
+    var overlay = document.getElementById("kb-export-overlay");
+    if (overlay) overlay.style.display = "none";
+  }
+  function findCard(colId, cardId) {
+    var list = board[colId] || [];
+    for (var i = 0; i < list.length; i++) {
+      if (list[i].id === cardId) return list[i];
+    }
+    return null;
+  }
+  function updateCardText(cardId, newText) {
+    var changed = false;
+    COLUMN_DEFS.forEach(function (col) {
+      var card = findCard(col.id, cardId);
+      if (card && card.text !== newText) { card.text = newText; changed = true; }
+    });
+    if (changed) saveToStorage();
+  }
+  function toggleAssignee(cardId, who) {
+    var changed = false;
+    COLUMN_DEFS.forEach(function (col) {
+      var card = findCard(col.id, cardId);
+      if (!card) return;
+      card.assignees = card.assignees || [];
+      var idx = card.assignees.indexOf(who);
+      if (idx === -1) { card.assignees.push(who); } else { card.assignees.splice(idx, 1); }
+      changed = true;
+    });
+    if (changed) { render(); saveToStorage(); }
+  }
+  function updateCardDue(cardId, newDue) {
+    var changed = false;
+    COLUMN_DEFS.forEach(function (col) {
+      var card = findCard(col.id, cardId);
+      if (card && card.due !== newDue) { card.due = newDue; changed = true; }
+    });
+    if (changed) { render(); saveToStorage(); }
+  }
+  function deleteCard(colId, cardId) {
+    board[colId] = (board[colId] || []).filter(function (c) { return c.id !== cardId; });
+    render();
+    saveToStorage();
+  }
+  function addCard(colId, text) {
+    var trimmed = (text || "").trim();
+    if (!trimmed) return;
+    board[colId] = board[colId] || [];
+    board[colId].push({ id: makeId(), text: trimmed, assignees: [], due: "" });
+    render();
+    saveToStorage();
+  }
+  async function saveToStorage() {
+    setStatus("Salvando...");
+    try {
+      var resp = await fetch(JSONBIN_BASE_URL, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Access-Key": JSONBIN_ACCESS_KEY
+        },
+        body: JSON.stringify(board)
+      });
+      if (!resp.ok) throw new Error("save-failed");
+      var now = new Date();
+      setUpdatedLabel("Salvo às " + now.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }));
+      setStatus("");
+    } catch (e) {
+      setStatus("Erro ao salvar. As mudanças podem não ter sido compartilhadas.");
+    }
+  }
+  async function loadFromStorage(manual) {
+    var btn = document.getElementById("kb-refresh");
+    if (btn) btn.classList.add("loading");
+    setStatus(manual ? "Buscando atualizações..." : "Carregando...");
+    try {
+      var resp = null;
+      try {
+        resp = await fetch(JSONBIN_BASE_URL + "/latest", {
+          headers: { "X-Access-Key": JSONBIN_ACCESS_KEY }
+        });
+      } catch (getErr) {
+        resp = null;
+      }
+      if (resp && resp.ok) {
+        var data = await resp.json();
+        board = toCardObjects(data.record);
+      } else if (manual) {
+        setStatus("Nada salvo ainda neste quadro compartilhado.");
+        board = toCardObjects(DEFAULT_BOARD);
+      } else {
+        board = toCardObjects(DEFAULT_BOARD);
+        await saveToStorage();
+      }
+      render();
+      var now = new Date();
+      setUpdatedLabel("Atualizado às " + now.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }));
+      setStatus("");
+    } catch (e) {
+      board = toCardObjects(DEFAULT_BOARD);
+      render();
+      setUpdatedLabel("Lista inicial (nada salvo ainda)");
+      await saveToStorage();
+    } finally {
+      if (btn) btn.classList.remove("loading");
+    }
+  }
+  render();
+  loadFromStorage(false);
+})();
+</script>
+</body>
+</html>
